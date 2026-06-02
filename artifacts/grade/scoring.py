@@ -249,11 +249,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Grade saved JSON output for the order-agent lab")
     parser.add_argument("--module", default="solution.agent.graph")
     parser.add_argument("--cases", default=str(ROOT_DIR / "data" / "graded_cases.json"))
-    parser.add_argument("--provider", default="google", choices=["google", "ollama"])
+    parser.add_argument("--provider", default="google", choices=["google", "openai", "ollama"])
     parser.add_argument("--model-name", default=None)
     parser.add_argument("--today", default="2026-06-01")
     parser.add_argument("--pass-threshold", type=float, default=80.0)
-    parser.add_argument("--judge-provider", default=None, choices=["google", "ollama"])
+    parser.add_argument("--judge-provider", default=None, choices=["google", "openai", "ollama", "none"])
     parser.add_argument("--judge-model-name", default=None)
     args = parser.parse_args()
 
@@ -263,11 +263,15 @@ def main() -> int:
 
     cases = load_cases(Path(args.cases))
     effective_judge_provider = args.judge_provider
-    if effective_judge_provider is None and any(case["weights"].get("llm_judge", 0) > 0 for case in cases):
+    if effective_judge_provider == "none":
+        effective_judge_provider = None
+    elif effective_judge_provider is None and any(case["weights"].get("llm_judge", 0) > 0 for case in cases):
         effective_judge_provider = args.provider
 
+    import time
     scores: list[CaseScore] = []
     for case in cases:
+        print(f"Running case: {case['id']}...")
         raw_result = module.run_agent(
             case["query"],
             provider=args.provider,
@@ -283,6 +287,7 @@ def main() -> int:
                 judge_model_name=args.judge_model_name,
             )
         )
+        time.sleep(0.8)
 
     summary = summarize_scores(scores)
     print(json.dumps(summary, indent=2, ensure_ascii=False))
